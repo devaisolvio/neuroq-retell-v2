@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroQ Voice Picker (Retell AI)</title>
+  <style>
+    :root {
+      --bg1: #0f2027; --bg2: #203a43; --bg3: #2c5364;
+      --accent: #4fd1c5; --accent-dark: #2c7a7b; --text: #eaf6f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, var(--bg1), var(--bg2), var(--bg3));
+      color: var(--text);
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 460px;
+      background: rgba(255,255,255,0.06); backdrop-filter: blur(14px);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 24px;
+      padding: 36px 32px; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .badge {
+      display: inline-block; font-size: 12px; letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--accent);
+      border: 1px solid var(--accent-dark); border-radius: 999px;
+      padding: 5px 14px; margin-bottom: 20px;
+    }
+    h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+    .sub { font-size: 14px; opacity: 0.8; margin-bottom: 26px; line-height: 1.5; }
+    .orb {
+      width: 110px; height: 110px; margin: 0 auto 26px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, var(--accent), var(--accent-dark) 70%);
+      display: flex; align-items: center; justify-content: center; font-size: 44px;
+      transition: box-shadow 0.3s ease; box-shadow: 0 0 0 0 rgba(79,209,197,0.5);
+    }
+    .orb.speaking { animation: pulse 1.2s infinite; }
+    .orb.live { box-shadow: 0 0 0 8px rgba(79,209,197,0.18); }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(79,209,197,0.5); }
+      70% { box-shadow: 0 0 0 26px rgba(79,209,197,0); }
+      100% { box-shadow: 0 0 0 0 rgba(79,209,197,0); }
+    }
+    label.fld { display:block; text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:1px; opacity:0.7; margin-bottom:8px; }
+    select {
+      width: 100%; padding: 14px; border-radius: 12px; font-size: 15px;
+      border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.25);
+      color: var(--text); margin-bottom: 20px; cursor: pointer; appearance: none;
+    }
+    select:focus { outline: 2px solid var(--accent); }
+    button {
+      width: 100%; border: none; border-radius: 14px; padding: 16px;
+      font-size: 17px; font-weight: 600; cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.2s ease;
+      color: #04211f; background: var(--accent);
+    }
+    button:hover { transform: translateY(-2px); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    button.end { background: #f56565; color: #fff; }
+    .status { margin-top: 16px; font-size: 14px; min-height: 20px; opacity: 0.85; }
+    .foot { margin-top: 22px; font-size: 12px; opacity: 0.5; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">NeuroQ &bull; Voice Picker</div>
+    <div class="orb" id="orb">🧠</div>
+    <h1>Pick Sarah's Voice</h1>
+    <p class="sub">Choose a voice, start the call, and talk to Sarah in that voice. End the call, pick another, and compare.</p>
+
+    <label class="fld" for="voiceSel">Voice</label>
+    <select id="voiceSel"></select>
+
+    <button id="callBtn">Start Call</button>
+    <div class="status" id="status">Ready when you are.</div>
+    <p class="foot">Use Chrome, wear headphones, and allow the microphone when asked. Every voice runs the same Sarah script, only the voice changes.</p>
+  </div>
+
+  <script type="module">
+    import { RetellWebClient } from "https://esm.sh/retell-client-js-sdk@2.0.7";
+
+    const VOICES = [
+      {"label":"Emily — warm, mature","agent_id":"agent_aad6b31c474490b92e4dc6cf6a"},
+      {"label":"Ellen — warm, mature","agent_id":"agent_73f3afcebedd1b1babc273dae0"},
+      {"label":"Joan — mature","agent_id":"agent_6aad6224c45b2aebec4599276a"},
+      {"label":"Cathy — mature","agent_id":"agent_115c19ef33f0b104ef0e3aa488"},
+      {"label":"Susan — mature","agent_id":"agent_45aebfd8c9129961ff4db802bb"},
+      {"label":"Kate — mature","agent_id":"agent_6229336033f081e0d44c852650"},
+      {"label":"Merritt — mature","agent_id":"agent_62d8f666967127b9b93d3abea2"},
+      {"label":"Marissa — natural, younger","agent_id":"agent_72336824c25a725fa0f7ddb817"},
+      {"label":"Jenny — friendly, younger","agent_id":"agent_eae0f9df68bab0531dc3109802"},
+      {"label":"Zuri — older","agent_id":"agent_fadd86412eddcd2311bf3783b6"},
+      {"label":"John — male, mature","agent_id":"agent_8d85aff4d4aaacee722e549b06"},
+      {"label":"Michael — male, mature","agent_id":"agent_cbc8376bfe01d6aa94ea2f8d7e"}
+    ];
+
+    const sel = document.getElementById("voiceSel");
+    const btn = document.getElementById("callBtn");
+    const status = document.getElementById("status");
+    const orb = document.getElementById("orb");
+    let client = null, active = false;
+
+    VOICES.forEach((v, i) => {
+      const o = document.createElement("option");
+      o.value = v.agent_id; o.textContent = v.label; if (i === 0) o.selected = true;
+      sel.appendChild(o);
+    });
+
+    window.addEventListener("unhandledrejection", (e) => {
+      status.textContent = "Error: " + (e.reason?.message || e.reason || "unknown");
+    });
+
+    function wire() {
+      client = new RetellWebClient();
+      client.on("call_started", () => {
+        active = true; btn.disabled = false; sel.disabled = true;
+        btn.textContent = "End Call"; btn.classList.add("end");
+        orb.classList.add("live");
+        status.textContent = "Connected, say hello!";
+      });
+      client.on("call_ended", () => {
+        active = false; btn.disabled = false; sel.disabled = false;
+        btn.textContent = "Start Call"; btn.classList.remove("end");
+        orb.classList.remove("live", "speaking");
+        status.textContent = "Call ended. Pick another voice to compare.";
+      });
+      client.on("agent_start_talking", () => orb.classList.add("speaking"));
+      client.on("agent_stop_talking", () => orb.classList.remove("speaking"));
+      client.on("error", (err) => {
+        console.error(err);
+        status.textContent = "Something went wrong: " + (err?.message || "please try again");
+        try { client.stopCall(); } catch (e) {}
+        active = false; btn.disabled = false; sel.disabled = false;
+        btn.textContent = "Start Call"; btn.classList.remove("end");
+      });
+    }
+
+    btn.addEventListener("click", async () => {
+      try {
+        if (!active) {
+          btn.disabled = true;
+          status.textContent = "Loading " + sel.options[sel.selectedIndex].text + "...";
+          if (!client) wire();
+          const resp = await fetch("/retell/web-call", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ agent_id: sel.value }),
+          });
+          if (!resp.ok) throw new Error("web-call " + resp.status);
+          const { access_token } = await resp.json();
+          status.textContent = "Connecting... (allow microphone access)";
+          await client.startCall({ accessToken: access_token });
+        } else {
+          client.stopCall();
+        }
+      } catch (e) {
+        console.error(e);
+        btn.disabled = false; sel.disabled = false; btn.textContent = "Start Call";
+        status.textContent = "Error: " + (e?.message || e);
+      }
+    });
+  </script>
+</body>
+</html>
